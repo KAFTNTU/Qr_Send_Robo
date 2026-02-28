@@ -70,7 +70,7 @@ body.layout-mobile .sensor-row .btn-qr {
     overflow: hidden;
 }
 @media (min-width: 640px) {
-    #qrPanelInner { border-radius: 20px; max-height: 80vh; }
+    #qrPanelInner { border-radius: 20px; max-height: 95vh; }
 }
 
 /* ---- Хедер панелі ---- */
@@ -665,7 +665,11 @@ function loadXMLToWorkspace(xml, name) {
     if (!window.workspace || !xml) return;
     try {
         window.workspace.clear();
-        const dom = Blockly.Xml.textToDom(xml);
+        /* Сумісність з різними версіями Blockly */
+        const textToDom = Blockly.Xml.textToDom
+            || Blockly.utils?.xml?.textToDom
+            || ((s) => new DOMParser().parseFromString(s, 'text/xml').documentElement);
+        const dom = textToDom(xml);
         Blockly.Xml.domToWorkspace(dom, window.workspace);
         window.closeQRPanel();
         if (typeof window.log === 'function')
