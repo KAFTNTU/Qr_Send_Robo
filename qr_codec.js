@@ -157,6 +157,174 @@ function encodeBlock(b, out) {
             out.push(s);
             break;
         }
+        /* ---- Цикл кожні N секунд ---- */
+        case 'loop_every_seconds': {
+            const sec = numVal(b.getInputTargetBlock('SEC'), 1);
+            const body = [];
+            encodeChain(b.getInputTargetBlock('DO'), body);
+            out.push('EV:' + sec + '{' + body.join(';') + '}');
+            break;
+        }
+        /* ---- cooldown_do ---- */
+        case 'cooldown_do': {
+            const sec = numVal(b.getInputTargetBlock('SEC'), 1);
+            const body = [];
+            encodeChain(b.getInputTargetBlock('DO'), body);
+            out.push('CD:' + sec + '{' + body.join(';') + '}');
+            break;
+        }
+        /* ---- replay_loop ---- */
+        case 'replay_loop': {
+            const n = Math.round(numVal(b.getInputTargetBlock('TIMES'), 1));
+            out.push('RPL:' + n); break;
+        }
+        /* ---- count_laps ---- */
+        case 'count_laps': {
+            const n = Math.round(numVal(b.getInputTargetBlock('LAPS'), 1));
+            out.push('CL:' + n); break;
+        }
+        /* ---- Прості без параметрів ---- */
+        case 'go_home':           out.push('GH');   break;
+        case 'wait_start':        out.push('WS');   break;
+        case 'stop_at_start':     out.push('SS');   break;
+        case 'record_start':      out.push('RC');   break;
+        case 'replay_track':      out.push('RP');   break;
+        case 'state_get':         out.push('SG');   break;
+        case 'state_time_s':      out.push('STM');  break;
+        case 'state_prev':        out.push('SPR');  break;
+        case 'track_action':      out.push('TA');   break;
+        case 'start_line_action': out.push('SLA');  break;
+        case 'math_speed_cms':    out.push('MSPD'); break;
+        /* ---- logic_edge_detect ---- */
+        case 'logic_edge_detect': {
+            const val = encodeExprBlock(b.getInputTargetBlock('VAL'));
+            out.push('ED:' + val); break;
+        }
+        /* ---- logic_schmitt ---- */
+        case 'logic_schmitt': {
+            const high = numVal(b.getInputTargetBlock('HIGH'), 60);
+            const low  = numVal(b.getInputTargetBlock('LOW'), 30);
+            const val  = encodeExprBlock(b.getInputTargetBlock('VAL'));
+            out.push('SCH:' + high + ',' + low + ',' + val); break;
+        }
+        /* ---- math_smooth ---- */
+        case 'math_smooth': {
+            const val  = encodeExprBlock(b.getInputTargetBlock('VAL'));
+            const size = b.getFieldValue('SIZE') || '5';
+            out.push('MSM:' + size + ',' + val); break;
+        }
+        /* ---- math_pid ---- */
+        case 'math_pid': {
+            const err = numVal(b.getInputTargetBlock('ERROR'), 0);
+            const kp  = numVal(b.getInputTargetBlock('KP'), 1);
+            const ki  = numVal(b.getInputTargetBlock('KI'), 0);
+            const kd  = numVal(b.getInputTargetBlock('KD'), 0);
+            out.push('PID:' + err + ',' + kp + ',' + ki + ',' + kd); break;
+        }
+        /* ---- Math utilities (value blocks) ---- */
+        case 'math_radius_from_diameter': {
+            out.push('MRD:' + numVal(b.getInputTargetBlock('D'), 0)); break;
+        }
+        case 'math_diameter_from_radius': {
+            out.push('MDR:' + numVal(b.getInputTargetBlock('R'), 0)); break;
+        }
+        case 'math_path_vt': {
+            out.push('MPV:' + numVal(b.getInputTargetBlock('V'), 0) + ',' + numVal(b.getInputTargetBlock('T'), 0)); break;
+        }
+        case 'math_pythagoras': {
+            out.push('MPY:' + numVal(b.getInputTargetBlock('A'), 0) + ',' + numVal(b.getInputTargetBlock('B'), 0)); break;
+        }
+        case 'math_rect_perimeter': {
+            out.push('MRP:' + numVal(b.getInputTargetBlock('W'), 0) + ',' + numVal(b.getInputTargetBlock('H'), 0)); break;
+        }
+        /* ---- calibrate_speed_line ---- */
+        case 'calibrate_speed_line': {
+            const l   = numVal(b.getInputTargetBlock('L'), 50);
+            const port= b.getFieldValue('PORT') || '1';
+            const cmp = b.getFieldValue('CMP') || 'LT';
+            const thr = numVal(b.getInputTargetBlock('THR'), 50);
+            const spd = numVal(b.getInputTargetBlock('SPD'), 80);
+            out.push('CAL:' + l + ',' + port + ',' + cmp + ',' + thr + ',' + spd); break;
+        }
+        /* ---- autopilot_distance ---- */
+        case 'autopilot_distance': {
+            const port= b.getFieldValue('PORT') || '1';
+            const dir = b.getFieldValue('DIR') || 'RIGHT';
+            const thr = numVal(b.getInputTargetBlock('THR'), 30);
+            const spd = numVal(b.getInputTargetBlock('SPD'), 80);
+            out.push('AP:' + port + ',' + dir[0] + ',' + thr + ',' + spd); break;
+        }
+        /* ---- State машина ---- */
+        case 'state_set': {
+            const st = b.getInputTargetBlock('STATE');
+            const nm = st && st.getFieldValue ? (st.getFieldValue('TEXT') || 'idle') : 'idle';
+            out.push('SET:' + nm); break;
+        }
+        case 'state_set_reason': {
+            const st = b.getInputTargetBlock('STATE');
+            const re = b.getInputTargetBlock('REASON');
+            const sn = st && st.getFieldValue ? (st.getFieldValue('TEXT') || 'idle') : 'idle';
+            const rn = re && re.getFieldValue ? (re.getFieldValue('TEXT') || '') : '';
+            out.push('SETR:' + sn + ',' + rn); break;
+        }
+        case 'state_enter_count': {
+            const st = b.getInputTargetBlock('STATE');
+            const nm = st && st.getFieldValue ? (st.getFieldValue('TEXT') || 'idle') : 'idle';
+            out.push('SECN:' + nm); break;
+        }
+        case 'state_if': {
+            const st = b.getInputTargetBlock('STATE');
+            const nm = st && st.getFieldValue ? (st.getFieldValue('TEXT') || 'idle') : 'idle';
+            const doBody = []; encodeChain(b.getInputTargetBlock('DO'), doBody);
+            const elBody = []; encodeChain(b.getInputTargetBlock('ELSE'), elBody);
+            let s = 'SIF:' + nm + '{' + doBody.join(';') + '}';
+            if (elBody.length) s += 'EL{' + elBody.join(';') + '}';
+            out.push(s); break;
+        }
+        /* ---- latch ---- */
+        case 'latch_set': {
+            const n = b.getInputTargetBlock('NAME');
+            out.push('LS:' + (n && n.getFieldValue ? (n.getFieldValue('TEXT') || 'f') : 'f')); break;
+        }
+        case 'latch_reset': {
+            const n = b.getInputTargetBlock('NAME');
+            out.push('LR:' + (n && n.getFieldValue ? (n.getFieldValue('TEXT') || 'f') : 'f')); break;
+        }
+        case 'latch_get': {
+            const n = b.getInputTargetBlock('NAME');
+            out.push('LG:' + (n && n.getFieldValue ? (n.getFieldValue('TEXT') || 'f') : 'f')); break;
+        }
+        /* ---- Умовні блоки з таймером ---- */
+        case 'wait_until_true_for': {
+            const cond = encodeCondBlock(b.getInputTargetBlock('COND'));
+            const sec  = numVal(b.getInputTargetBlock('SEC'), 0.2);
+            out.push('WTF:' + cond + ',' + sec); break;
+        }
+        case 'if_true_for': {
+            const cond = encodeCondBlock(b.getInputTargetBlock('COND'));
+            const sec  = numVal(b.getInputTargetBlock('SEC'), 0.2);
+            const doBody = []; encodeChain(b.getInputTargetBlock('DO'), doBody);
+            const elBody = []; encodeChain(b.getInputTargetBlock('ELSE'), elBody);
+            let s = 'ITF:' + cond + ',' + sec + '{' + doBody.join(';') + '}';
+            if (elBody.length) s += 'EL{' + elBody.join(';') + '}';
+            out.push(s); break;
+        }
+        case 'timeout_do_until': {
+            const sec  = numVal(b.getInputTargetBlock('SEC'), 3);
+            const cond = encodeCondBlock(b.getInputTargetBlock('COND'));
+            const doBody = []; encodeChain(b.getInputTargetBlock('DO'), doBody);
+            out.push('TDU:' + sec + ',' + cond + '{' + doBody.join(';') + '}'); break;
+        }
+        case 'if_happened_n_times': {
+            const times = Math.round(numVal(b.getInputTargetBlock('TIMES'), 3));
+            const sec   = numVal(b.getInputTargetBlock('SEC'), 1);
+            const cond  = encodeCondBlock(b.getInputTargetBlock('COND'));
+            const doBody = []; encodeChain(b.getInputTargetBlock('DO'), doBody);
+            const elBody = []; encodeChain(b.getInputTargetBlock('ELSE'), elBody);
+            let s = 'IHN:' + times + ',' + sec + ',' + cond + '{' + doBody.join(';') + '}';
+            if (elBody.length) s += 'EL{' + elBody.join(';') + '}';
+            out.push(s); break;
+        }
         default:
             /* Невідомий блок — пропускаємо */
             break;
@@ -302,7 +470,94 @@ class Parser {
                 return { type:'wait_until_sensor', SENS:params[0], OP:symToOp(params[1]), VAL:n(params[2]) };
             }
 
+            /* ---- Нові прості з параметром ---- */
+            if (t === 'RPL') return { type:'replay_loop', TIMES:n(params[0]) };
+            if (t === 'CL')  return { type:'count_laps', LAPS:n(params[0]) };
+            if (t === 'ED')  return { type:'logic_edge_detect', VAL:args };
+            if (t === 'SCH') return { type:'logic_schmitt', HIGH:n(params[0]), LOW:n(params[1]), VAL:params[2] };
+            if (t === 'MSM') return { type:'math_smooth', SIZE:params[0], VAL:params[1] };
+            if (t === 'PID') return { type:'math_pid', ERROR:n(params[0]), KP:n(params[1]), KI:n(params[2]), KD:n(params[3]) };
+            if (t === 'MRD') return { type:'math_radius_from_diameter', D:n(params[0]) };
+            if (t === 'MDR') return { type:'math_diameter_from_radius', R:n(params[0]) };
+            if (t === 'MPV') return { type:'math_path_vt', V:n(params[0]), T:n(params[1]) };
+            if (t === 'MPY') return { type:'math_pythagoras', A:n(params[0]), B:n(params[1]) };
+            if (t === 'MRP') return { type:'math_rect_perimeter', W:n(params[0]), H:n(params[1]) };
+            if (t === 'CAL') return { type:'calibrate_speed_line', L:n(params[0]), PORT:params[1], CMP:params[2], THR:n(params[3]), SPD:n(params[4]) };
+            if (t === 'AP')  return { type:'autopilot_distance', PORT:params[0], DIR:params[1]==='R'?'RIGHT':'LEFT', THR:n(params[2]), SPD:n(params[3]) };
+            if (t === 'SET') return { type:'state_set', STATE:args };
+            if (t === 'SETR')return { type:'state_set_reason', STATE:params[0], REASON:params[1] };
+            if (t === 'SECN')return { type:'state_enter_count', STATE:args };
+            if (t === 'LS')  return { type:'latch_set', NAME:args };
+            if (t === 'LR')  return { type:'latch_reset', NAME:args };
+            if (t === 'LG')  return { type:'latch_get', NAME:args };
+            if (t === 'WTF') {
+                /* WTF:cond,sec  — але cond може містити коми! треба парсити по-іншому */
+                /* Останній елемент після останньої коми — це sec */
+                const lastComma = args.lastIndexOf(',');
+                const cond = parseSimpleCond(args.slice(0, lastComma));
+                const sec  = n(args.slice(lastComma + 1));
+                return { type:'wait_until_true_for', COND:cond, SEC:sec };
+            }
+
             /* ---- Блокові команди з тілом ---- */
+            if (t === 'EV') {
+                const sec = n(args);
+                const bodyStr = this.readBlock();
+                return { type:'loop_every_seconds', SEC:sec, DO:new Parser(bodyStr).parseStmtList() };
+            }
+            if (t === 'CD') {
+                const sec = n(args);
+                const bodyStr = this.readBlock();
+                return { type:'cooldown_do', SEC:sec, DO:new Parser(bodyStr).parseStmtList() };
+            }
+            if (t === 'SIF') {
+                const name = args;
+                const doStr = this.readBlock();
+                const doBody = new Parser(doStr).parseStmtList();
+                let elBody = [];
+                const saved = this.pos;
+                const nxt = this.readUntil([';', '{', '}']);
+                if (nxt.trim() === 'EL') { elBody = new Parser(this.readBlock()).parseStmtList(); }
+                else { this.pos = saved; }
+                return { type:'state_if', STATE:name, DO:doBody, ELSE:elBody };
+            }
+            if (t === 'ITF') {
+                const lastComma = args.lastIndexOf(',');
+                const cond = parseSimpleCond(args.slice(0, lastComma));
+                const sec  = n(args.slice(lastComma + 1));
+                const doStr = this.readBlock();
+                const doBody = new Parser(doStr).parseStmtList();
+                let elBody = [];
+                const saved = this.pos;
+                const nxt = this.readUntil([';', '{', '}']);
+                if (nxt.trim() === 'EL') { elBody = new Parser(this.readBlock()).parseStmtList(); }
+                else { this.pos = saved; }
+                return { type:'if_true_for', COND:cond, SEC:sec, DO:doBody, ELSE:elBody };
+            }
+            if (t === 'TDU') {
+                /* TDU:sec,cond{body} — sec перша, потім cond */
+                const firstComma = args.indexOf(',');
+                const sec  = n(args.slice(0, firstComma));
+                const cond = parseSimpleCond(args.slice(firstComma + 1));
+                const bodyStr = this.readBlock();
+                return { type:'timeout_do_until', SEC:sec, COND:cond, DO:new Parser(bodyStr).parseStmtList() };
+            }
+            if (t === 'IHN') {
+                /* IHN:times,sec,cond{body} */
+                const p = args.split(',');
+                const times = n(p[0]);
+                const sec   = n(p[1]);
+                const cond  = parseSimpleCond(p.slice(2).join(','));
+                const doStr = this.readBlock();
+                const doBody = new Parser(doStr).parseStmtList();
+                let elBody = [];
+                const saved = this.pos;
+                const nxt = this.readUntil([';', '{', '}']);
+                if (nxt.trim() === 'EL') { elBody = new Parser(this.readBlock()).parseStmtList(); }
+                else { this.pos = saved; }
+                return { type:'if_happened_n_times', TIMES:times, SEC:sec, COND:cond, DO:doBody, ELSE:elBody };
+            }
+            /* ---- Оригінальні блокові команди ---- */
             if (t === 'C') {
                 const count = n(args);
                 const bodyStr = this.readBlock();
@@ -342,6 +597,18 @@ class Parser {
                 return { type:'controls_whileUntil', MODE:mode, COND:cond, DO:thenBody };
             }
         }
+
+        if (t === 'GH')   return { type:'go_home' };
+        if (t === 'WS')   return { type:'wait_start' };
+        if (t === 'SS')   return { type:'stop_at_start' };
+        if (t === 'RC')   return { type:'record_start' };
+        if (t === 'RP')   return { type:'replay_track' };
+        if (t === 'SG')   return { type:'state_get' };
+        if (t === 'STM')  return { type:'state_time_s' };
+        if (t === 'SPR')  return { type:'state_prev' };
+        if (t === 'TA')   return { type:'track_action' };
+        if (t === 'SLA')  return { type:'start_line_action' };
+        if (t === 'MSPD') return { type:'math_speed_cms' };
 
         /* ---- Вічний цикл F{...} ---- */
         if (t === 'F') {
@@ -413,11 +680,12 @@ function blockXML(stmt, nextStmts) {
     const next = nextStmts && nextStmts.length ? nextStmts : [];
 
     /* Рекурсивно будуємо XML */
+    const type = (stmt.type === 'controls_forever') ? 'loop_forever' : stmt.type;
     const inner = stmtInnerXML(stmt);
     const nextXML = chainXML(next);
     const nextTag = nextXML ? '<next>' + nextXML + '</next>' : '';
 
-    return '<block type="' + stmt.type + '">' + inner + nextTag + '</block>';
+    return '<block type="' + type + '">' + inner + nextTag + '</block>';
 }
 
 function chainXML(stmts) {
@@ -539,7 +807,9 @@ function stmtInnerXML(stmt) {
 
         case 'controls_forever':
         case 'loop_forever':
+            /* Завжди генеруємо loop_forever — бо controls_forever не визначений */
             return '<statement name="DO">' + chainXML(stmt.DO) + '</statement>';
+
 
         case 'controls_whileUntil':
             return '<field name="MODE">' + stmt.MODE + '</field>' +
@@ -554,6 +824,121 @@ function stmtInnerXML(stmt) {
                    '<statement name="DO0">' + chainXML(stmt.DO) + '</statement>' +
                    elseTag;
         }
+        /* ---- Прості без параметрів ---- */
+        case 'go_home':
+        case 'wait_start':
+        case 'stop_at_start':
+        case 'record_start':
+        case 'replay_track':
+        case 'state_get':
+        case 'state_time_s':
+        case 'state_prev':
+        case 'track_action':
+        case 'start_line_action':
+        case 'math_speed_cms':
+            return '';
+
+        /* ---- З числом ---- */
+        case 'replay_loop':
+            return valueTag('TIMES', stmt.TIMES);
+        case 'count_laps':
+            return valueTag('LAPS', stmt.LAPS);
+
+        /* ---- loop_every_seconds ---- */
+        case 'loop_every_seconds':
+            return valueTag('SEC', stmt.SEC) +
+                   '<statement name="DO">' + chainXML(stmt.DO) + '</statement>';
+
+        /* ---- cooldown_do ---- */
+        case 'cooldown_do':
+            return valueTag('SEC', stmt.SEC) +
+                   '<statement name="DO">' + chainXML(stmt.DO) + '</statement>';
+
+        /* ---- logic_edge_detect ---- */
+        case 'logic_edge_detect':
+            return '<value name="VAL">' + exprXML(stmt.VAL) + '</value>';
+
+        /* ---- logic_schmitt ---- */
+        case 'logic_schmitt':
+            return valueTag('HIGH', stmt.HIGH) + valueTag('LOW', stmt.LOW) +
+                   '<value name="VAL">' + exprXML(stmt.VAL) + '</value>';
+
+        /* ---- math_smooth ---- */
+        case 'math_smooth':
+            return '<field name="SIZE">' + stmt.SIZE + '</field>' +
+                   '<value name="VAL">' + exprXML(stmt.VAL) + '</value>';
+
+        /* ---- math_pid ---- */
+        case 'math_pid':
+            return valueTag('ERROR', stmt.ERROR) + valueTag('KP', stmt.KP) +
+                   valueTag('KI', stmt.KI) + valueTag('KD', stmt.KD);
+
+        /* ---- Math utilities ---- */
+        case 'math_radius_from_diameter': return valueTag('D', stmt.D);
+        case 'math_diameter_from_radius': return valueTag('R', stmt.R);
+        case 'math_path_vt':  return valueTag('V', stmt.V) + valueTag('T', stmt.T);
+        case 'math_pythagoras': return valueTag('A', stmt.A) + valueTag('B', stmt.B);
+        case 'math_rect_perimeter': return valueTag('W', stmt.W) + valueTag('H', stmt.H);
+
+        /* ---- calibrate_speed_line ---- */
+        case 'calibrate_speed_line':
+            return valueTag('L', stmt.L) +
+                   '<field name="PORT">' + stmt.PORT + '</field>' +
+                   '<field name="CMP">' + stmt.CMP + '</field>' +
+                   valueTag('THR', stmt.THR) + valueTag('SPD', stmt.SPD);
+
+        /* ---- autopilot_distance ---- */
+        case 'autopilot_distance':
+            return '<field name="PORT">' + stmt.PORT + '</field>' +
+                   '<field name="DIR">' + stmt.DIR + '</field>' +
+                   valueTag('THR', stmt.THR) + valueTag('SPD', stmt.SPD);
+
+        /* ---- State машина ---- */
+        case 'state_set':
+            return '<value name="STATE"><block type="text"><field name="TEXT">' + stmt.STATE + '</field></block></value>';
+        case 'state_set_reason':
+            return '<value name="STATE"><block type="text"><field name="TEXT">' + stmt.STATE + '</field></block></value>' +
+                   '<value name="REASON"><block type="text"><field name="TEXT">' + stmt.REASON + '</field></block></value>';
+        case 'state_enter_count':
+            return '<value name="STATE"><block type="text"><field name="TEXT">' + stmt.STATE + '</field></block></value>';
+        case 'state_if': {
+            const elTag = stmt.ELSE && stmt.ELSE.length
+                ? '<statement name="ELSE">' + chainXML(stmt.ELSE) + '</statement>' : '';
+            return '<value name="STATE"><block type="text"><field name="TEXT">' + stmt.STATE + '</field></block></value>' +
+                   '<statement name="DO">' + chainXML(stmt.DO) + '</statement>' + elTag;
+        }
+
+        /* ---- latch ---- */
+        case 'latch_set':
+            return '<value name="NAME"><block type="text"><field name="TEXT">' + stmt.NAME + '</field></block></value>';
+        case 'latch_reset':
+            return '<value name="NAME"><block type="text"><field name="TEXT">' + stmt.NAME + '</field></block></value>';
+        case 'latch_get':
+            return '<value name="NAME"><block type="text"><field name="TEXT">' + stmt.NAME + '</field></block></value>';
+
+        /* ---- Умовні з таймером ---- */
+        case 'wait_until_true_for':
+            return '<value name="COND">' + condToXML(stmt.COND) + '</value>' +
+                   valueTag('SEC', stmt.SEC);
+        case 'if_true_for': {
+            const elTag = stmt.ELSE && stmt.ELSE.length
+                ? '<statement name="ELSE">' + chainXML(stmt.ELSE) + '</statement>' : '';
+            return '<value name="COND">' + condToXML(stmt.COND) + '</value>' +
+                   valueTag('SEC', stmt.SEC) +
+                   '<statement name="DO">' + chainXML(stmt.DO) + '</statement>' + elTag;
+        }
+        case 'timeout_do_until':
+            return valueTag('SEC', stmt.SEC) +
+                   '<value name="COND">' + condToXML(stmt.COND) + '</value>' +
+                   '<statement name="DO">' + chainXML(stmt.DO) + '</statement>';
+        case 'if_happened_n_times': {
+            const elTag = stmt.ELSE && stmt.ELSE.length
+                ? '<statement name="ELSE">' + chainXML(stmt.ELSE) + '</statement>' : '';
+            return valueTag('TIMES', stmt.TIMES) + valueTag('SEC', stmt.SEC) +
+                   '<value name="COND">' + condToXML(stmt.COND) + '</value>' +
+                   '<statement name="DO">' + chainXML(stmt.DO) + '</statement>' + elTag;
+        }
+
         default: return '';
     }
 }
