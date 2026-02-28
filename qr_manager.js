@@ -52,8 +52,9 @@ body.layout-mobile .sensor-row .btn-qr {
     background: rgba(0,0,0,0.7);
     backdrop-filter: blur(6px);
     display: none;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: center;
+    padding-top: 15vh;
     padding-bottom: env(safe-area-inset-bottom, 0);
 }
 #qrPanel.open { display: flex; }
@@ -65,7 +66,7 @@ body.layout-mobile .sensor-row .btn-qr {
     border: 1px solid rgba(148,163,184,0.15);
     border-radius: 20px 20px 0 0;
     width: 100%; max-width: 520px;
-    max-height: 88vh;
+    max-height: 80vh;
     display: flex; flex-direction: column;
     overflow: hidden;
 }
@@ -478,9 +479,24 @@ window.generateQR = async function () {
 
         wrap.style.display = 'block';
 
-        /* Отримати dataUrl для збереження */
-        const img = canv.querySelector('img') || canv.querySelector('canvas');
-        const dataUrl = img ? (img.src || img.toDataURL()) : '';
+        /* Отримати dataUrl для збереження (мобільний повертає <img>, десктоп — <canvas>) */
+        const imgEl    = canv.querySelector('img');
+        const canvEl   = canv.querySelector('canvas');
+        let dataUrl = '';
+        if (imgEl && imgEl.src && imgEl.src.startsWith('data:')) {
+            dataUrl = imgEl.src;
+        } else if (canvEl && typeof canvEl.toDataURL === 'function') {
+            dataUrl = canvEl.toDataURL();
+        } else if (imgEl && imgEl.src) {
+            /* img.src може бути blob або http — спробуємо через canvas */
+            try {
+                const tmp = document.createElement('canvas');
+                tmp.width = 240; tmp.height = 240;
+                const ctx = tmp.getContext('2d');
+                ctx.drawImage(imgEl, 0, 0);
+                dataUrl = tmp.toDataURL();
+            } catch(e) { dataUrl = ''; }
+        }
 
         const name = document.getElementById('qrNameInput').value.trim() ||
                      _autoName() || 'Програма';
