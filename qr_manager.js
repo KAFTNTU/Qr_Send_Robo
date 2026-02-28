@@ -218,12 +218,11 @@ body.layout-mobile .sensor-row .btn-qr {
 .qr-history-thumb canvas, .qr-history-thumb img { width: 100%; height: 100%; display:block; }
 .qr-history-info { flex: 1; min-width: 0; }
 .qr-history-name {
-    font-size: 14px; font-weight: 600; color: #38bdf8;
+    font-size: 14px; font-weight: 600; color: #e2e8f0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     cursor: pointer; transition: color .15s;
-    text-decoration: underline; text-underline-offset: 2px;
 }
-.qr-history-name:hover { color: #7dd3fc; }
+.qr-history-name:hover { color: #38bdf8; text-decoration: underline; }
 .qr-history-date { font-size: 11px; color: #64748b; margin-top: 2px; }
 .qr-history-size { font-size: 11px; color: #475569; }
 .qr-history-del {
@@ -414,33 +413,42 @@ window.generateQR = async function () {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Генерую...';
 
     try {
-        /* Отримати XML блоків — підтримка різних версій Blockly */
-        let xml;
-        if (typeof Blockly.Xml?.workspaceToDom === 'function') {
-            xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(window.workspace));
-        } else {
-            xml = Blockly.serialization.workspaces.save(window.workspace);
-            xml = JSON.stringify(xml);
-        }
+        /* ── Спробувати компактний формат v2 (QRCodec) ── */
+        let payload, xml, bytecodeB64 = '', useCompact = false;
 
-        /* Отримати байткод якщо є компілятор */
-        let bytecodeB64 = '';
-        if (window.STMCompiler) {
+        if (window.QRCodec) {
             try {
-                const c = new window.STMCompiler();
-                const code = c.compile(window.workspace);
-                if (code && code.length > 0) {
-                    bytecodeB64 = btoa(String.fromCharCode(...code));
-                }
-            } catch(e) {}
+                const compact = window.QRCodec.encode(window.workspace);
+                payload = 'Q2:' + compact;   // префікс версії v2
+                useCompact = true;
+                /* XML зберігаємо локально (для history), але не в QR */
+                xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(window.workspace));
+            } catch(e) {
+                useCompact = false;
+                if (typeof window.log === 'function')
+                    window.log('⚠️ Компактний QR не вдався: ' + e + ' — використовую XML', 'err');
+            }
         }
 
-        /* Дані для QR: JSON з xml і bytecode */
-        const payload = JSON.stringify({
-            v: 1,
-            xml: xml,
-            bc: bytecodeB64,
-        });
+        if (!useCompact) {
+            /* Fallback: старий формат v1 (повний XML) */
+            xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(window.workspace));
+            if (window.STMCompiler) {
+                try {
+                    const c = new window.STMCompiler();
+                    const code = c.compile(window.workspace);
+                    if (code && code.length > 0)
+                        bytecodeB64 = btoa(String.fromCharCode(...code));
+                } catch(e) {}
+            }
+            payload = JSON.stringify({ v:1, xml, bc: bytecodeB64 });
+        }
+
+        /* Показати розмір у логу */
+        if (typeof window.log === 'function') {
+            const fmt = useCompact ? 'компактний v2' : 'XML v1';
+            window.log(`📦 QR формат: ${fmt} — ${payload.length} символів`, 'info');
+        }
 
         /* Перевірити розмір */
         if (payload.length > 2953) {
@@ -606,19 +614,35 @@ function scanFrame(video) {
 
 function processScannedData(raw) {
     try {
-        const data = JSON.parse(raw);
-        _scannedData = data;
+        let xml = null;
+
+        if (raw.startsWith('Q2:')) {
+            /* ── Формат v2: компактний рядок ── */
+            const compact = raw.slice(3);
+            if (window.QRCodec) {
+                xml = window.QRCodec.decode(compact);
+            } else {
+                throw new Error('QRCodec не завантажений');
+            }
+            _scannedData = { xml, compact };
+        } else {
+            /* ── Формат v1: JSON з XML ── */
+            const data = JSON.parse(raw);
+            xml = data.xml;
+            _scannedData = data;
+        }
 
         const resultEl = document.getElementById('qrScanResult');
         if (resultEl) {
             resultEl.style.display = 'block';
+            resultEl.style.color = '';
             resultEl.textContent = '✅ Знайдено програму!';
         }
 
         const loadBtn = document.getElementById('qrLoadBtn');
         if (loadBtn) {
             loadBtn.style.display = 'block';
-            loadBtn.onclick = () => loadXMLToWorkspace(data.xml, 'Сканований QR');
+            loadBtn.onclick = () => loadXMLToWorkspace(xml, 'Сканований QR');
         }
 
         if (typeof window.log === 'function')
@@ -629,7 +653,7 @@ function processScannedData(raw) {
         if (resultEl) {
             resultEl.style.display = 'block';
             resultEl.style.color = '#f87171';
-            resultEl.textContent = '❌ Невідомий QR код';
+            resultEl.textContent = '❌ Невідомий QR код: ' + e.message;
         }
     }
 }
@@ -641,25 +665,8 @@ function loadXMLToWorkspace(xml, name) {
     if (!window.workspace || !xml) return;
     try {
         window.workspace.clear();
-
-        /* Підтримка різних версій Blockly API */
-        let dom;
-        if (typeof Blockly.utils?.xml?.textToDom === 'function') {
-            dom = Blockly.utils.xml.textToDom(xml);          /* Blockly v9+ */
-        } else if (typeof Blockly.Xml?.textToDom === 'function') {
-            dom = Blockly.Xml.textToDom(xml);                /* Blockly v8 */
-        } else {
-            /* Fallback: стандартний DOMParser */
-            const parser = new DOMParser();
-            dom = parser.parseFromString(xml, 'text/xml').documentElement;
-        }
-
-        if (typeof Blockly.Xml?.domToWorkspace === 'function') {
-            Blockly.Xml.domToWorkspace(dom, window.workspace);
-        } else if (typeof Blockly.serialization?.workspaces?.load === 'function') {
-            Blockly.serialization.workspaces.load(JSON.parse(xml), window.workspace);
-        }
-
+        const dom = Blockly.Xml.textToDom(xml);
+        Blockly.Xml.domToWorkspace(dom, window.workspace);
         window.closeQRPanel();
         if (typeof window.log === 'function')
             window.log(`📂 Завантажено блоки: "${name}"`, 'info');
