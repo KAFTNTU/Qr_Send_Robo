@@ -64,13 +64,12 @@ body.layout-mobile .sensor-row .btn-qr {
     border: 1px solid rgba(148,163,184,0.15);
     border-radius: 20px 20px 0 0;
     width: 100%; max-width: 520px;
-    /* Мобільний: панель від 30% до низу екрану */
     height: 82vh;
     display: flex; flex-direction: column;
     overflow: hidden;
 }
 @media (min-width: 640px) {
-    #qrPanelInner { border-radius: 20px; height: auto; max-height: 95vh; overflow-y: auto; }
+    #qrPanelInner { border-radius: 20px; height: auto; max-height: 92vh; }
 }
 
 /* ---- Хедер панелі ---- */
@@ -126,7 +125,15 @@ body.layout-mobile .sensor-row .btn-qr {
     box-shadow: 0 0 30px rgba(14,165,233,0.2);
 }
 #qrCanvas { display: block; }
-
+#qrNameInput {
+    width: 100%; padding: 10px 14px; border-radius: 10px;
+    background: rgba(148,163,184,0.08);
+    border: 1px solid rgba(148,163,184,0.2);
+    color: #f1f5f9; font-size: 14px; outline: none;
+    box-sizing: border-box;
+}
+#qrNameInput:focus { border-color: rgba(14,165,233,0.5); }
+#qrNameInput::placeholder { color: #64748b; }
 #qrGenBtn {
     width: 100%; padding: 11px; border-radius: 12px;
     background: linear-gradient(135deg, rgba(14,165,233,0.9), rgba(6,182,212,0.9));
@@ -315,40 +322,16 @@ const panelHTML = `
       <!-- Генерація -->
       <div class="qr-pane active" id="qrPaneGen">
         <div id="qrGenBox">
-
+          <input id="qrNameInput" type="text" placeholder="Назва програми (необов'язково)">
           <button id="qrGenBtn" onclick="generateQR()">
             <i class="fa-solid fa-qrcode"></i> Згенерувати QR
           </button>
-
-          <!-- QR зображення -->
-          <div id="qrCanvasWrap" style="display:none;">
+          <div id="qrCanvasWrap" style="display:none">
             <div id="qrCanvas"></div>
           </div>
-
-          <!-- Кнопка зберегти + inline попап з назвою -->
-          <div id="qrSaveArea" style="display:none;width:100%;position:relative;">
-            <button id="qrSaveBtn" onclick="showSavePopup()">
-              <i class="fa-solid fa-floppy-disk"></i> Зберегти в історію
-            </button>
-            <!-- Попап з назвою -->
-            <div id="qrSavePopup" style="display:none;position:absolute;bottom:calc(100% + 8px);left:0;right:0;background:#1e293b;border:1px solid rgba(34,197,94,0.4);border-radius:12px;padding:12px;z-index:10;box-shadow:0 -8px 24px rgba(0,0,0,0.4);">
-              <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">Назва для збереження:</div>
-              <input id="qrSaveNameInput" type="text" placeholder="Назва програми"
-                style="width:100%;padding:8px 12px;border-radius:8px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:8px;"
-                onkeydown="if(event.key==='Enter')confirmSaveQR()">
-              <div style="display:flex;gap:8px;">
-                <button onclick="confirmSaveQR()"
-                  style="flex:1;padding:8px;border-radius:8px;background:rgba(34,197,94,0.3);border:1px solid rgba(34,197,94,0.4);color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;">
-                  <i class="fa-solid fa-check"></i> Зберегти
-                </button>
-                <button onclick="document.getElementById('qrSavePopup').style.display='none'"
-                  style="padding:8px 14px;border-radius:8px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.15);color:#94a3b8;font-size:13px;cursor:pointer;">
-                  Скасувати
-                </button>
-              </div>
-            </div>
-          </div>
-
+          <button id="qrSaveBtn" onclick="saveCurrentQR()">
+            <i class="fa-solid fa-floppy-disk"></i> Зберегти в історію
+          </button>
         </div>
       </div>
 
@@ -428,14 +411,6 @@ window.generateQR = async function () {
     const btn = document.getElementById('qrGenBtn');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Генерую...';
-
-    /* Скидаємо попередній QR */
-    const _prevWrap = document.getElementById('qrCanvasWrap');
-    const _prevCanv = document.getElementById('qrCanvas');
-    if (_prevWrap) _prevWrap.style.display = 'none';
-    if (_prevCanv) _prevCanv.innerHTML = '';
-    document.getElementById('qrSaveArea').style.display = 'none';
-    document.getElementById('qrSavePopup').style.display = 'none';
 
     try {
         /* ── Спробувати компактний формат v2 (QRCodec) ── */
@@ -527,9 +502,7 @@ window.generateQR = async function () {
 
         _currentQRData = { name, xml, bytecodeB64, dataUrl, size: payload.length };
 
-        /* Підготувати поле назви в попапі збереження */
-        document.getElementById('qrSaveNameInput').value = _currentQRData.name;
-        document.getElementById('qrSaveArea').style.display = 'block';
+        document.getElementById('qrSaveBtn').style.display = 'block';
 
         if (typeof window.log === 'function')
             window.log(`📱 QR згенеровано: ${payload.length} символів`, 'info');
@@ -562,56 +535,77 @@ function _autoName() {
 /* ================================================================
    ЗБЕРЕЖЕННЯ В ІСТОРІЮ
    ================================================================ */
-/* Показати попап збереження */
-window.showSavePopup = function() {
-    const popup = document.getElementById('qrSavePopup');
-    if (!popup) return;
-    popup.style.display = popup.style.display === 'none' ? 'flex' : 'none';
-    if (popup.style.display === 'flex') {
-        popup.style.flexDirection = 'column';
-        setTimeout(() => document.getElementById('qrSaveNameInput').focus(), 50);
-    }
-};
-
-/* Підтвердити збереження */
-window.confirmSaveQR = function() {
+window.saveCurrentQR = function () {
     if (!_currentQRData) return;
-    const nameInp = document.getElementById('qrSaveNameInput');
-    const name = (nameInp ? nameInp.value.trim() : '') || _currentQRData.name || 'Програма';
 
     const history = loadHistory();
     const entry = {
-        id:      Date.now(),
-        name:    name,
-        xml:     _currentQRData.xml,
-        bc:      _currentQRData.bytecodeB64,
-        dataUrl: _currentQRData.dataUrl,
-        size:    _currentQRData.size,
-        url:     _currentQRData.url || null,
-        date:    new Date().toLocaleString('uk-UA', {
+        id:       Date.now(),
+        name:     _currentQRData.name,
+        xml:      _currentQRData.xml,
+        bc:       _currentQRData.bytecodeB64,
+        dataUrl:  _currentQRData.dataUrl,
+        size:     _currentQRData.size,
+        date:     new Date().toLocaleString('uk-UA', {
             day:'2-digit', month:'2-digit', year:'numeric',
             hour:'2-digit', minute:'2-digit'
         }),
     };
+
     history.unshift(entry);
     if (history.length > MAX_HISTORY) history.pop();
     saveHistory(history);
 
-    /* Закрити попап, сховати QR і кнопку */
-    document.getElementById('qrSavePopup').style.display = 'none';
-    document.getElementById('qrSaveArea').style.display = 'none';
-    document.getElementById('qrCanvasWrap').style.display = 'none';
-    document.getElementById('qrCanvas').innerHTML = '';
-    _currentQRData = null;
+    document.getElementById('qrSaveBtn').innerHTML =
+        '<i class="fa-solid fa-check"></i> Збережено!';
+    setTimeout(() => {
+        document.getElementById('qrSaveBtn').innerHTML =
+            '<i class="fa-solid fa-floppy-disk"></i> Зберегти в історію';
+    }, 1500);
 
     if (typeof window.log === 'function')
         window.log(`💾 QR збережено: "${entry.name}"`, 'info');
 };
 
+
+/* ================================================================
+   АВТО-ОНОВЛЕННЯ QR — спрацьовує при зміні блоків
+   ================================================================ */
+let _autoQRTimer = null;
+function _scheduleAutoQR() {
+    if (!_autoQRTimer) {
+        _autoQRTimer = setTimeout(() => {
+            _autoQRTimer = null;
+            /* Оновлюємо тільки якщо панель відкрита і таб генерації активний */
+            const panel = document.getElementById('qrPanel');
+            const pane  = document.getElementById('qrPaneGen');
+            const wrap  = document.getElementById('qrCanvasWrap');
+            if (panel && panel.classList.contains('open') &&
+                pane  && pane.classList.contains('active') &&
+                wrap  && wrap.style.display !== 'none') {
+                window.generateQR();
+            }
+        }, 1500);
+    }
+}
+
+/* Підключити до Blockly після завантаження */
+function _attachBlocklyListener() {
+    if (window.workspace && window.workspace.addChangeListener) {
+        window.workspace.addChangeListener(e => {
+            if (e.type === 'finished_loading') return;
+            _scheduleAutoQR();
+        });
+    } else {
+        setTimeout(_attachBlocklyListener, 1000);
+    }
+}
+_attachBlocklyListener();
+
 /* ================================================================
    СКАНУВАННЯ (мобільний)
    ================================================================ */
-/* Використовуємо лише onclick — без addEventListener щоб не конфліктували */
+/* Тільки onclick щоб не конфліктували обробники */
 const _scanBtn = document.getElementById('qrStartScanBtn');
 if (_scanBtn) _scanBtn.onclick = IS_MOBILE ? startScan : null;
 
@@ -627,9 +621,9 @@ async function startScan() {
         if (!video) return;
         video.srcObject = _scanStream;
         video.style.display = 'block';
-        const btn = document.getElementById('qrStartScanBtn');
-        btn.innerHTML = '<i class="fa-solid fa-stop"></i> Зупинити';
-        btn.onclick = stopScan;   // ТІЛЬКИ onclick, без addEventListener
+        document.getElementById('qrStartScanBtn').innerHTML =
+            '<i class="fa-solid fa-stop"></i> Зупинити';
+        document.getElementById('qrStartScanBtn').onclick = stopScan;
 
         _scanInterval = setInterval(() => scanFrame(video), 200);
     } catch(e) {
@@ -643,18 +637,17 @@ function stopScan() {
     if (video) {
         video.pause();
         video.srcObject = null;
-        /* video.load() примушує браузер повністю відпустити камеру */
         try { video.load(); } catch(e) {}
         video.style.display = 'none';
     }
-    if (_scanStream)   {
+    if (_scanStream) {
         _scanStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
         _scanStream = null;
     }
     const startBtn = document.getElementById('qrStartScanBtn');
     if (startBtn) {
         startBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Сканувати QR';
-        startBtn.onclick = startScan;   // повертаємо onclick назад
+        startBtn.onclick = startScan;
     }
 }
 
