@@ -571,10 +571,9 @@ window.saveCurrentQR = function () {
 /* ================================================================
    СКАНУВАННЯ (мобільний)
    ================================================================ */
-if (IS_MOBILE) {
-    const startBtn = document.getElementById('qrStartScanBtn');
-    if (startBtn) startBtn.addEventListener('click', startScan);
-}
+/* Використовуємо лише onclick — без addEventListener щоб не конфліктували */
+const _scanBtn = document.getElementById('qrStartScanBtn');
+if (_scanBtn) _scanBtn.onclick = IS_MOBILE ? startScan : null;
 
 async function startScan() {
     if (!QR_LIBS_LOADED.jsqr) {
@@ -588,9 +587,9 @@ async function startScan() {
         if (!video) return;
         video.srcObject = _scanStream;
         video.style.display = 'block';
-        document.getElementById('qrStartScanBtn').innerHTML =
-            '<i class="fa-solid fa-stop"></i> Зупинити';
-        document.getElementById('qrStartScanBtn').onclick = stopScan;
+        const btn = document.getElementById('qrStartScanBtn');
+        btn.innerHTML = '<i class="fa-solid fa-stop"></i> Зупинити';
+        btn.onclick = stopScan;   // ТІЛЬКИ onclick, без addEventListener
 
         _scanInterval = setInterval(() => scanFrame(video), 200);
     } catch(e) {
@@ -615,7 +614,7 @@ function stopScan() {
     const startBtn = document.getElementById('qrStartScanBtn');
     if (startBtn) {
         startBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Сканувати QR';
-        startBtn.onclick = startScan;
+        startBtn.onclick = startScan;   // повертаємо onclick назад
     }
 }
 
