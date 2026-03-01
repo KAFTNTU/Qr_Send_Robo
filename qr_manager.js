@@ -52,10 +52,8 @@ body.layout-mobile .sensor-row .btn-qr {
     background: rgba(0,0,0,0.7);
     backdrop-filter: blur(6px);
     display: none;
-    align-items: flex-start;
+    align-items: flex-end;
     justify-content: center;
-    padding-top: 15vh;
-    padding-bottom: env(safe-area-inset-bottom, 0);
 }
 #qrPanel.open { display: flex; }
 @media (min-width: 640px) {
@@ -66,7 +64,8 @@ body.layout-mobile .sensor-row .btn-qr {
     border: 1px solid rgba(148,163,184,0.15);
     border-radius: 20px 20px 0 0;
     width: 100%; max-width: 520px;
-    max-height: 80vh;
+    /* Мобільний: панель від 30% до низу екрану */
+    height: 72vh;
     display: flex; flex-direction: column;
     overflow: hidden;
 }
@@ -120,6 +119,7 @@ body.layout-mobile .sensor-row .btn-qr {
 /* ---- Генерація ---- */
 #qrGenBox {
     display: flex; flex-direction: column; align-items: center; gap: 14px;
+    flex: 1;
 }
 #qrCanvasWrap {
     background: #fff; border-radius: 12px; padding: 12px;
@@ -153,7 +153,7 @@ body.layout-mobile .sensor-row .btn-qr {
 #qrSaveBtn:hover { background: rgba(34,197,94,0.28); }
 
 /* ---- Сканування ---- */
-#qrScanBox { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#qrScanBox { display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; }
 #qrVideo {
     width: 100%; max-width: 320px; border-radius: 14px;
     background: #000; aspect-ratio: 1;
@@ -600,12 +600,18 @@ async function startScan() {
 
 function stopScan() {
     if (_scanInterval) { clearInterval(_scanInterval); _scanInterval = null; }
+    const video = document.getElementById('qrVideo');
+    if (video) {
+        video.pause();
+        video.srcObject = null;
+        /* video.load() примушує браузер повністю відпустити камеру */
+        try { video.load(); } catch(e) {}
+        video.style.display = 'none';
+    }
     if (_scanStream)   {
-        _scanStream.getTracks().forEach(t => t.stop());
+        _scanStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
         _scanStream = null;
     }
-    const video = document.getElementById('qrVideo');
-    if (video) { video.style.display = 'none'; video.srcObject = null; }
     const startBtn = document.getElementById('qrStartScanBtn');
     if (startBtn) {
         startBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Сканувати QR';
