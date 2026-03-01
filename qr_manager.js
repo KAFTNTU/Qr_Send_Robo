@@ -65,7 +65,7 @@ body.layout-mobile .sensor-row .btn-qr {
     border-radius: 20px 20px 0 0;
     width: 100%; max-width: 520px;
     /* Мобільний: панель від 30% до низу екрану */
-    height: 72vh;
+    height: 82vh;
     display: flex; flex-direction: column;
     overflow: hidden;
 }
@@ -126,15 +126,15 @@ body.layout-mobile .sensor-row .btn-qr {
     box-shadow: 0 0 30px rgba(14,165,233,0.2);
 }
 #qrCanvas { display: block; }
-#qrNameInput {
+#qrNameInput, #qrUrlNameInput {
     width: 100%; padding: 10px 14px; border-radius: 10px;
     background: rgba(148,163,184,0.08);
     border: 1px solid rgba(148,163,184,0.2);
     color: #f1f5f9; font-size: 14px; outline: none;
     box-sizing: border-box;
 }
-#qrNameInput:focus { border-color: rgba(14,165,233,0.5); }
-#qrNameInput::placeholder { color: #64748b; }
+#qrNameInput:focus, #qrUrlNameInput:focus { border-color: rgba(14,165,233,0.5); }
+#qrNameInput::placeholder, #qrUrlNameInput::placeholder { color: #64748b; }
 #qrGenBtn {
     width: 100%; padding: 11px; border-radius: 12px;
     background: linear-gradient(135deg, rgba(14,165,233,0.9), rgba(6,182,212,0.9));
@@ -323,7 +323,18 @@ const panelHTML = `
       <!-- Генерація -->
       <div class="qr-pane active" id="qrPaneGen">
         <div id="qrGenBox">
-          <input id="qrNameInput" type="text" placeholder="Назва програми (необов'язково)">
+          <div id="qrNameWrap" style="width:100%;position:relative;">
+            <input id="qrNameInput" type="text" placeholder="Назва або URL (https://...)"
+              oninput="onQRNameInput()"
+              style="width:100%;padding:10px 14px;border-radius:10px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box;">
+            <!-- Підказка URL -->
+            <div id="qrUrlHint" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.35);color:#38bdf8;font-size:13px;word-break:break-all;cursor:pointer;" onclick="window.open(document.getElementById('qrNameInput').value,'_blank')">
+              🔗 <span id="qrUrlText"></span>
+            </div>
+            <!-- Окреме поле назви для URL -->
+            <input id="qrUrlNameInput" type="text" placeholder="Назва для QR (необов'язково)"
+              style="display:none;margin-top:8px;width:100%;padding:10px 14px;border-radius:10px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
           <button id="qrGenBtn" onclick="generateQR()">
             <i class="fa-solid fa-qrcode"></i> Згенерувати QR
           </button>
@@ -401,6 +412,24 @@ window.switchQRTab = function (tab) {
 /* ================================================================
    ГЕНЕРАЦІЯ QR
    ================================================================ */
+/* ================================================================
+   ОБРОБКА ПОЛЯ НАЗВИ — підсвічення URL
+   ================================================================ */
+window.onQRNameInput = function() {
+    const val = document.getElementById('qrNameInput').value.trim();
+    const isUrl = val.startsWith('http://') || val.startsWith('https://');
+    const hint    = document.getElementById('qrUrlHint');
+    const urlText = document.getElementById('qrUrlText');
+    const urlName = document.getElementById('qrUrlNameInput');
+    if (hint) hint.style.display    = isUrl ? 'block' : 'none';
+    if (urlText) urlText.textContent = val;
+    if (urlName) urlName.style.display = isUrl ? 'block' : 'none';
+    /* Підсвічуємо саме поле синім якщо URL */
+    const inp = document.getElementById('qrNameInput');
+    if (inp) inp.style.borderColor = isUrl ? 'rgba(14,165,233,0.7)' : '';
+    if (inp) inp.style.color = isUrl ? '#38bdf8' : '#f1f5f9';
+};
+
 window.generateQR = async function () {
     if (!window.workspace) {
         alert('Немає Blockly workspace!'); return;
@@ -418,6 +447,7 @@ window.generateQR = async function () {
         const _nameRaw = document.getElementById('qrNameInput').value.trim();
         if (_nameRaw.startsWith('http://') || _nameRaw.startsWith('https://')) {
             const _urlPayload = _nameRaw;
+            const _urlName = document.getElementById('qrUrlNameInput').value.trim() || _urlPayload;
             const wrap = document.getElementById('qrCanvasWrap');
             const canv = document.getElementById('qrCanvas');
             canv.innerHTML = ''; wrap.style.display = 'none';
@@ -430,6 +460,13 @@ window.generateQR = async function () {
                 } catch(e) { reject(e); }
             });
             wrap.style.display = 'block';
+            /* Отримати dataUrl */
+            const _imgEl = canv.querySelector('img'); const _canvEl = canv.querySelector('canvas');
+            let _dataUrl = '';
+            if (_imgEl && _imgEl.src && _imgEl.src.startsWith('data:')) _dataUrl = _imgEl.src;
+            else if (_canvEl) _dataUrl = _canvEl.toDataURL();
+            _currentQRData = { name: _urlName, url: _urlPayload, dataUrl: _dataUrl, size: _urlPayload.length };
+            document.getElementById('qrSaveBtn').style.display = 'block';
             if (typeof window.log === 'function')
                 window.log('🌐 QR для URL: ' + _urlPayload, 'info');
             btn.disabled = false;
@@ -582,6 +619,12 @@ window.saveCurrentQR = function () {
 
     document.getElementById('qrSaveBtn').innerHTML =
         '<i class="fa-solid fa-check"></i> Збережено!';
+    /* Скидати поле назви після збереження */
+    const _ni = document.getElementById('qrNameInput');
+    const _uni = document.getElementById('qrUrlNameInput');
+    if (_ni) _ni.value = '';
+    if (_uni) _uni.value = '';
+    onQRNameInput(); /* сховати URL підказку */
     setTimeout(() => {
         document.getElementById('qrSaveBtn').innerHTML =
             '<i class="fa-solid fa-floppy-disk"></i> Зберегти в історію';
