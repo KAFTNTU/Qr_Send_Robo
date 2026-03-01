@@ -126,15 +126,8 @@ body.layout-mobile .sensor-row .btn-qr {
     box-shadow: 0 0 30px rgba(14,165,233,0.2);
 }
 #qrCanvas { display: block; }
-#qrNameInput, #qrUrlNameInput {
-    width: 100%; padding: 10px 14px; border-radius: 10px;
-    background: rgba(148,163,184,0.08);
-    border: 1px solid rgba(148,163,184,0.2);
-    color: #f1f5f9; font-size: 14px; outline: none;
-    box-sizing: border-box;
-}
-#qrNameInput:focus, #qrUrlNameInput:focus { border-color: rgba(14,165,233,0.5); }
-#qrNameInput::placeholder, #qrUrlNameInput::placeholder { color: #64748b; }
+#qrUrlToggleBtn:hover { background: rgba(14,165,233,0.15) !important; color: #38bdf8 !important; border-color: rgba(14,165,233,0.4) !important; }
+#qrUrlToggleBtn.active { background: rgba(14,165,233,0.2) !important; color: #38bdf8 !important; border-color: rgba(14,165,233,0.5) !important; }
 #qrGenBtn {
     width: 100%; padding: 11px; border-radius: 12px;
     background: linear-gradient(135deg, rgba(14,165,233,0.9), rgba(6,182,212,0.9));
@@ -323,27 +316,55 @@ const panelHTML = `
       <!-- Генерація -->
       <div class="qr-pane active" id="qrPaneGen">
         <div id="qrGenBox">
-          <div id="qrNameWrap" style="width:100%;position:relative;">
-            <input id="qrNameInput" type="text" placeholder="Назва або URL (https://...)"
-              oninput="onQRNameInput()"
-              style="width:100%;padding:10px 14px;border-radius:10px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box;">
-            <!-- Підказка URL -->
-            <div id="qrUrlHint" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;background:rgba(14,165,233,0.12);border:1px solid rgba(14,165,233,0.35);color:#38bdf8;font-size:13px;word-break:break-all;cursor:pointer;" onclick="window.open(document.getElementById('qrNameInput').value,'_blank')">
-              🔗 <span id="qrUrlText"></span>
-            </div>
-            <!-- Окреме поле назви для URL -->
-            <input id="qrUrlNameInput" type="text" placeholder="Назва для QR (необов'язково)"
-              style="display:none;margin-top:8px;width:100%;padding:10px 14px;border-radius:10px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box;">
+
+          <!-- Рядок: кнопка генерації + іконка URL -->
+          <div style="display:flex;gap:8px;width:100%;">
+            <button id="qrGenBtn" onclick="generateQR()" style="flex:1;">
+              <i class="fa-solid fa-qrcode"></i> Згенерувати QR
+            </button>
+            <button id="qrUrlToggleBtn" onclick="toggleUrlMode()"
+              title="Згенерувати QR для сайту"
+              style="padding:11px 14px;border-radius:12px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#94a3b8;font-size:16px;cursor:pointer;transition:all .2s;flex-shrink:0;">
+              🔗
+            </button>
           </div>
-          <button id="qrGenBtn" onclick="generateQR()">
-            <i class="fa-solid fa-qrcode"></i> Згенерувати QR
-          </button>
-          <div id="qrCanvasWrap" style="display:none">
+
+          <!-- URL режим (прихований за замовчуванням) -->
+          <div id="qrUrlMode" style="display:none;width:100%;flex-direction:column;gap:8px;">
+            <input id="qrUrlInput" type="url" placeholder="https://..."
+              style="width:100%;padding:10px 14px;border-radius:10px;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.4);color:#38bdf8;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
+
+          <!-- QR зображення -->
+          <div id="qrCanvasWrap" style="display:none;">
             <div id="qrCanvas"></div>
           </div>
-          <button id="qrSaveBtn" onclick="saveCurrentQR()">
-            <i class="fa-solid fa-floppy-disk"></i> Зберегти в історію
-          </button>
+
+          <!-- Кнопка зберегти + inline попап з назвою -->
+          <div id="qrSaveArea" style="display:none;width:100%;position:relative;">
+            <button id="qrSaveBtn" onclick="showSavePopup()"
+              style="width:100%;padding:9px;border-radius:12px;background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.3);color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">
+              <i class="fa-solid fa-floppy-disk"></i> Зберегти в історію
+            </button>
+            <!-- Попап з назвою -->
+            <div id="qrSavePopup" style="display:none;position:absolute;bottom:calc(100% + 8px);left:0;right:0;background:#1e293b;border:1px solid rgba(34,197,94,0.4);border-radius:12px;padding:12px;z-index:10;box-shadow:0 -8px 24px rgba(0,0,0,0.4);">
+              <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">Назва для збереження:</div>
+              <input id="qrSaveNameInput" type="text" placeholder="Назва програми"
+                style="width:100%;padding:8px 12px;border-radius:8px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.2);color:#f1f5f9;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:8px;"
+                onkeydown="if(event.key==='Enter')confirmSaveQR()">
+              <div style="display:flex;gap:8px;">
+                <button onclick="confirmSaveQR()"
+                  style="flex:1;padding:8px;border-radius:8px;background:rgba(34,197,94,0.3);border:1px solid rgba(34,197,94,0.4);color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;">
+                  <i class="fa-solid fa-check"></i> Зберегти
+                </button>
+                <button onclick="document.getElementById('qrSavePopup').style.display='none'"
+                  style="padding:8px 14px;border-radius:8px;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.15);color:#94a3b8;font-size:13px;cursor:pointer;">
+                  Скасувати
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -413,21 +434,18 @@ window.switchQRTab = function (tab) {
    ГЕНЕРАЦІЯ QR
    ================================================================ */
 /* ================================================================
-   ОБРОБКА ПОЛЯ НАЗВИ — підсвічення URL
+   TOGGLE URL РЕЖИМ
    ================================================================ */
-window.onQRNameInput = function() {
-    const val = document.getElementById('qrNameInput').value.trim();
-    const isUrl = val.startsWith('http://') || val.startsWith('https://');
-    const hint    = document.getElementById('qrUrlHint');
-    const urlText = document.getElementById('qrUrlText');
-    const urlName = document.getElementById('qrUrlNameInput');
-    if (hint) hint.style.display    = isUrl ? 'block' : 'none';
-    if (urlText) urlText.textContent = val;
-    if (urlName) urlName.style.display = isUrl ? 'block' : 'none';
-    /* Підсвічуємо саме поле синім якщо URL */
-    const inp = document.getElementById('qrNameInput');
-    if (inp) inp.style.borderColor = isUrl ? 'rgba(14,165,233,0.7)' : '';
-    if (inp) inp.style.color = isUrl ? '#38bdf8' : '#f1f5f9';
+window.toggleUrlMode = function() {
+    const urlMode = document.getElementById('qrUrlMode');
+    const btn = document.getElementById('qrUrlToggleBtn');
+    if (!urlMode) return;
+    const isOpen = urlMode.style.display !== 'none';
+    urlMode.style.display = isOpen ? 'none' : 'flex';
+    btn.classList.toggle('active', !isOpen);
+    if (!isOpen) {
+        setTimeout(() => document.getElementById('qrUrlInput').focus(), 50);
+    }
 };
 
 window.generateQR = async function () {
@@ -442,19 +460,20 @@ window.generateQR = async function () {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Генерую...';
 
-    /* Скидаємо попередній QR і поле назви перед новою генерацією */
+    /* Скидаємо попередній QR */
     const _prevWrap = document.getElementById('qrCanvasWrap');
     const _prevCanv = document.getElementById('qrCanvas');
     if (_prevWrap) _prevWrap.style.display = 'none';
     if (_prevCanv) _prevCanv.innerHTML = '';
-    document.getElementById('qrSaveBtn').style.display = 'none';
+    document.getElementById('qrSaveArea').style.display = 'none';
+    document.getElementById('qrSavePopup').style.display = 'none';
 
     try {
-        /* ── Якщо поле назви містить URL — генеруємо QR того URL ── */
-        const _nameRaw = document.getElementById('qrNameInput').value.trim();
-        if (_nameRaw.startsWith('http://') || _nameRaw.startsWith('https://')) {
-            const _urlPayload = _nameRaw;
-            const _urlName = document.getElementById('qrUrlNameInput').value.trim() || _urlPayload;
+        /* ── URL режим ── */
+        const _urlInp = document.getElementById('qrUrlInput');
+        const _urlMode = document.getElementById('qrUrlMode');
+        if (_urlMode && _urlMode.style.display !== 'none' && _urlInp && _urlInp.value.trim()) {
+            const _urlPayload = _urlInp.value.trim();
             const wrap = document.getElementById('qrCanvasWrap');
             const canv = document.getElementById('qrCanvas');
             canv.innerHTML = ''; wrap.style.display = 'none';
@@ -467,15 +486,15 @@ window.generateQR = async function () {
                 } catch(e) { reject(e); }
             });
             wrap.style.display = 'block';
-            /* Отримати dataUrl */
-            const _imgEl = canv.querySelector('img'); const _canvEl = canv.querySelector('canvas');
-            let _dataUrl = '';
-            if (_imgEl && _imgEl.src && _imgEl.src.startsWith('data:')) _dataUrl = _imgEl.src;
-            else if (_canvEl) _dataUrl = _canvEl.toDataURL();
-            _currentQRData = { name: _urlName, url: _urlPayload, dataUrl: _dataUrl, size: _urlPayload.length };
-            document.getElementById('qrSaveBtn').style.display = 'block';
-            if (typeof window.log === 'function')
-                window.log('🌐 QR для URL: ' + _urlPayload, 'info');
+            const _imgEl2 = canv.querySelector('img'); const _canvEl2 = canv.querySelector('canvas');
+            let _dataUrl2 = '';
+            if (_imgEl2 && _imgEl2.src && _imgEl2.src.startsWith('data:')) _dataUrl2 = _imgEl2.src;
+            else if (_canvEl2) _dataUrl2 = _canvEl2.toDataURL();
+            _currentQRData = { name: _urlPayload, url: _urlPayload, dataUrl: _dataUrl2, size: _urlPayload.length };
+            document.getElementById('qrSaveArea').style.display = 'block';
+            /* Підготувати поле назви в попапі */
+            document.getElementById('qrSaveNameInput').value = _urlPayload;
+            if (typeof window.log === 'function') window.log('🌐 QR для URL: ' + _urlPayload, 'info');
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Оновити QR';
             return;
@@ -570,12 +589,9 @@ window.generateQR = async function () {
 
         _currentQRData = { name, xml, bytecodeB64, dataUrl, size: payload.length };
 
-        /* Очистити поле назви після генерації */
-        const _ni2 = document.getElementById('qrNameInput');
-        if (_ni2) _ni2.value = '';
-        if (typeof onQRNameInput === 'function') onQRNameInput();
-
-        document.getElementById('qrSaveBtn').style.display = 'block';
+        /* Підготувати поле назви в попапі збереження */
+        document.getElementById('qrSaveNameInput').value = _currentQRData.name;
+        document.getElementById('qrSaveArea').style.display = 'block';
 
         if (typeof window.log === 'function')
             window.log(`📱 QR згенеровано: ${payload.length} символів`, 'info');
@@ -608,39 +624,47 @@ function _autoName() {
 /* ================================================================
    ЗБЕРЕЖЕННЯ В ІСТОРІЮ
    ================================================================ */
-window.saveCurrentQR = function () {
+/* Показати попап збереження */
+window.showSavePopup = function() {
+    const popup = document.getElementById('qrSavePopup');
+    if (!popup) return;
+    popup.style.display = popup.style.display === 'none' ? 'flex' : 'none';
+    if (popup.style.display === 'flex') {
+        popup.style.flexDirection = 'column';
+        setTimeout(() => document.getElementById('qrSaveNameInput').focus(), 50);
+    }
+};
+
+/* Підтвердити збереження */
+window.confirmSaveQR = function() {
     if (!_currentQRData) return;
+    const nameInp = document.getElementById('qrSaveNameInput');
+    const name = (nameInp ? nameInp.value.trim() : '') || _currentQRData.name || 'Програма';
 
     const history = loadHistory();
     const entry = {
-        id:       Date.now(),
-        name:     _currentQRData.name,
-        xml:      _currentQRData.xml,
-        bc:       _currentQRData.bytecodeB64,
-        dataUrl:  _currentQRData.dataUrl,
-        size:     _currentQRData.size,
-        date:     new Date().toLocaleString('uk-UA', {
+        id:      Date.now(),
+        name:    name,
+        xml:     _currentQRData.xml,
+        bc:      _currentQRData.bytecodeB64,
+        dataUrl: _currentQRData.dataUrl,
+        size:    _currentQRData.size,
+        url:     _currentQRData.url || null,
+        date:    new Date().toLocaleString('uk-UA', {
             day:'2-digit', month:'2-digit', year:'numeric',
             hour:'2-digit', minute:'2-digit'
         }),
     };
-
     history.unshift(entry);
     if (history.length > MAX_HISTORY) history.pop();
     saveHistory(history);
 
-    document.getElementById('qrSaveBtn').innerHTML =
-        '<i class="fa-solid fa-check"></i> Збережено!';
-    /* Скидати поле назви після збереження */
-    const _ni = document.getElementById('qrNameInput');
-    const _uni = document.getElementById('qrUrlNameInput');
-    if (_ni) _ni.value = '';
-    if (_uni) _uni.value = '';
-    onQRNameInput(); /* сховати URL підказку */
-    setTimeout(() => {
-        document.getElementById('qrSaveBtn').innerHTML =
-            '<i class="fa-solid fa-floppy-disk"></i> Зберегти в історію';
-    }, 1500);
+    /* Закрити попап, сховати QR і кнопку */
+    document.getElementById('qrSavePopup').style.display = 'none';
+    document.getElementById('qrSaveArea').style.display = 'none';
+    document.getElementById('qrCanvasWrap').style.display = 'none';
+    document.getElementById('qrCanvas').innerHTML = '';
+    _currentQRData = null;
 
     if (typeof window.log === 'function')
         window.log(`💾 QR збережено: "${entry.name}"`, 'info');
