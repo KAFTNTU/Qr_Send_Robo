@@ -442,6 +442,13 @@ window.generateQR = async function () {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Генерую...';
 
+    /* Скидаємо попередній QR і поле назви перед новою генерацією */
+    const _prevWrap = document.getElementById('qrCanvasWrap');
+    const _prevCanv = document.getElementById('qrCanvas');
+    if (_prevWrap) _prevWrap.style.display = 'none';
+    if (_prevCanv) _prevCanv.innerHTML = '';
+    document.getElementById('qrSaveBtn').style.display = 'none';
+
     try {
         /* ── Якщо поле назви містить URL — генеруємо QR того URL ── */
         const _nameRaw = document.getElementById('qrNameInput').value.trim();
@@ -562,6 +569,11 @@ window.generateQR = async function () {
                      _autoName() || 'Програма';
 
         _currentQRData = { name, xml, bytecodeB64, dataUrl, size: payload.length };
+
+        /* Очистити поле назви після генерації */
+        const _ni2 = document.getElementById('qrNameInput');
+        if (_ni2) _ni2.value = '';
+        if (typeof onQRNameInput === 'function') onQRNameInput();
 
         document.getElementById('qrSaveBtn').style.display = 'block';
 
