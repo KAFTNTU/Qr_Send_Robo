@@ -70,7 +70,7 @@ body.layout-mobile .sensor-row .btn-qr {
     overflow: hidden;
 }
 @media (min-width: 640px) {
-    #qrPanelInner { border-radius: 20px; max-height: 95vh; }
+    #qrPanelInner { border-radius: 20px; height: auto; max-height: 95vh; overflow-y: auto; }
 }
 
 /* ---- Хедер панелі ---- */
@@ -414,6 +414,29 @@ window.generateQR = async function () {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Генерую...';
 
     try {
+        /* ── Якщо поле назви містить URL — генеруємо QR того URL ── */
+        const _nameRaw = document.getElementById('qrNameInput').value.trim();
+        if (_nameRaw.startsWith('http://') || _nameRaw.startsWith('https://')) {
+            const _urlPayload = _nameRaw;
+            const wrap = document.getElementById('qrCanvasWrap');
+            const canv = document.getElementById('qrCanvas');
+            canv.innerHTML = ''; wrap.style.display = 'none';
+            await new Promise((resolve, reject) => {
+                try {
+                    new QRCode(canv, { text: _urlPayload, width: 240, height: 240,
+                        colorDark: '#000000', colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.M });
+                    setTimeout(resolve, 100);
+                } catch(e) { reject(e); }
+            });
+            wrap.style.display = 'block';
+            if (typeof window.log === 'function')
+                window.log('🌐 QR для URL: ' + _urlPayload, 'info');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Оновити QR';
+            return;
+        }
+
         /* ── Спробувати компактний формат v2 (QRCodec) ── */
         let payload, xml, bytecodeB64 = '', useCompact = false;
 
